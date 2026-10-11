@@ -116,10 +116,13 @@ object UsageStatsHelper {
             merge(usm.queryAndAggregateUsageStats(startTime, endTime).values)
         } catch (e: Exception) {
         }
+        // Query every interval bucket so we catch as many previously-uninstalled
+        // packages as the device still remembers (YEARLY helps a lot).
         val intervals = intArrayOf(
             UsageStatsManager.INTERVAL_DAILY,
             UsageStatsManager.INTERVAL_WEEKLY,
-            UsageStatsManager.INTERVAL_MONTHLY
+            UsageStatsManager.INTERVAL_MONTHLY,
+            UsageStatsManager.INTERVAL_YEARLY
         )
         for (interval in intervals) {
             try {

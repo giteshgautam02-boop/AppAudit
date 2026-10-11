@@ -53,23 +53,35 @@ class InstalledAppsRepository(private val context: Context) {
     }
 
     /**
-     * 1. Snapshot diff: apps we saw before that are gone now.
-     * 2. History scan: apps the OS shows as used in the last 30 days that are
-     *    not installed anymore (works instantly, even on first launch).
+     * Works WITHOUT root and WITHOUT Shizuku.
+     *
+     * 1. Snapshot diff — catches uninstalls that happened even 1 second ago
+     *    (as long as this audit app was already installed and had seen the app).
+     * 2. History scan via public UsageStatsManager (only needs "Usage access").
+     *    Window = last 365 days. This is what shows apps that were deleted
+     *    BEFORE this audit app was installed (as far as Android still keeps data).
+     * 3. Optional bonus: dumpsys via Shizuku/root if available (extra history).
      */
     suspend fun runAuditScan() {
         val now = System.currentTimeMillis()
+        // 365 days — maximum practical window for public UsageStats API
+        val historyStart = now - 365L * 24 * 60 * 60 * 1000
         val known = dao.getAllKnownPackages().associateBy { it.packageName }
         val current = currentlyInstalled()
         val hasUsage = UsageStatsHelper.hasUsageAccess(context)
+
+        // Primary source: public UsageStats API (no root / no Shizuku needed)
         val fromApi = if (hasUsage) {
-            UsageStatsHelper.queryActivity(context, now - 30L * 24 * 60 * 60 * 1000, now)
+            UsageStatsHelper.queryActivity(context, historyStart, now)
         } else emptyMap()
-        // Extra source: `dumpsys usagestats` via Shizuku/root (same history Android keeps in
-        // /data/system_ce/0/usagestats). Only fills in packages the normal API did not return.
+
+        // Optional bonus only — if Shizuku/root is present we get a bit more history
         val fromDump = try { UsageDumpReader.readActivity() } catch (_: Throwable) { emptyMap() }
+
+        // API is primary; dumpsys only fills gaps
         val activity = fromDump + fromApi
 
+        // ----- 1) Snapshot diff (works for recent uninstalls, even 1 sec ago) -----
         val disappeared = known.keys - current.keys
         disappeared.forEach { pkg ->
             val info = known.getValue(pkg)
@@ -79,7 +91,7 @@ class InstalledAppsRepository(private val context: Context) {
                     packageName = pkg,
                     appLabel = info.appLabel,
                     firstSeen = stats?.firstActive ?: info.firstSeen,
-                    lastActive = stats?.lastActive ?: info.firstSeen,
+                    lastActive = stats?.lastActive ?: now,
                     detectedAt = now,
                     activeDurationMs = stats?.activeDurationMs ?: 0L,
                     eventCount = stats?.eventCount ?: 0
@@ -88,11 +100,15 @@ class InstalledAppsRepository(private val context: Context) {
             dao.removeKnownPackage(pkg)
         }
 
+        // ----- 2) History scan (works on first launch, no root/Shizuku needed) -----
+        // Runs purely on Usage Access. Any package that appears in usage history
+        // but is no longer installed gets listed as deleted.
         if (hasUsage || activity.isNotEmpty()) {
             val installedAll = installedPackageNames()
             val logged = dao.getRecentUninstalls(0L).map { it.packageName }.toSet()
-            // an app that was reinstalled should leave the deleted list
+            // reinstalled apps should leave the deleted list
             logged.filter { it in installedAll }.forEach { dao.removeUninstalled(it) }
+
             activity.forEach { (pkg, stats) ->
                 if (pkg in logged || pkg in disappeared || pkg == context.packageName) return@forEach
                 if (pkg in installedAll || isInstalled(pkg)) return@forEach
@@ -110,6 +126,7 @@ class InstalledAppsRepository(private val context: Context) {
             }
         }
 
+        // ----- 3) Update known snapshot for next time -----
         val newOnes = current.keys - known.keys
         if (newOnes.isNotEmpty()) {
             dao.insertKnownPackages(newOnes.map { KnownPackage(it, current.getValue(it), now) })

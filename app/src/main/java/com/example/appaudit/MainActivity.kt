@@ -747,7 +747,13 @@ private fun LocalFilesTab() {
             }
         }
         Spacer(Modifier.height(8.dp))
-        Text(if (mode == 0) path else "${LocalFilesReader.ROOT} (saare subfolders mein search)", color = Cyan, fontFamily = Mono, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text(
+            if (mode == 0) {
+                if (path == LocalFilesReader.ROOT) "Local Temp Files"
+                else path.removePrefix("/data/local/tmp").ifEmpty { "Local Temp Files" }
+            } else "Flagged files (all subfolders)",
+            color = Cyan, fontFamily = Mono, fontSize = 11.sp, fontWeight = FontWeight.Bold
+        )
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (mode == 0 && path != LocalFilesReader.ROOT) {
