@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit
  *  3. NONE    – neither is available.
  *
  * Shell (Shizuku) can read /data/local/tmp, `pm`, `dumpsys` etc. It can NOT read
- * /data/system/* – that needs real root.
+ * Everything under /data/system (any file) - that needs real root.
  */
 object ShellAccess {
 
