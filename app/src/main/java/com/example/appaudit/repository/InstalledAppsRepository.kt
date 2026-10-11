@@ -7,6 +7,7 @@ import android.os.Build
 import com.example.appaudit.data.AppDatabase
 import com.example.appaudit.data.KnownPackage
 import com.example.appaudit.data.UninstalledApp
+import com.example.appaudit.usage.UsageDumpReader
 import com.example.appaudit.usage.UsageStatsHelper
 
 class InstalledAppsRepository(private val context: Context) {
@@ -61,9 +62,13 @@ class InstalledAppsRepository(private val context: Context) {
         val known = dao.getAllKnownPackages().associateBy { it.packageName }
         val current = currentlyInstalled()
         val hasUsage = UsageStatsHelper.hasUsageAccess(context)
-        val activity = if (hasUsage) {
+        val fromApi = if (hasUsage) {
             UsageStatsHelper.queryActivity(context, now - 30L * 24 * 60 * 60 * 1000, now)
         } else emptyMap()
+        // Extra source: `dumpsys usagestats` via Shizuku/root (same history Android keeps in
+        // /data/system_ce/0/usagestats). Only fills in packages the normal API did not return.
+        val fromDump = try { UsageDumpReader.readActivity() } catch (_: Throwable) { emptyMap() }
+        val activity = fromDump + fromApi
 
         val disappeared = known.keys - current.keys
         disappeared.forEach { pkg ->
@@ -83,7 +88,7 @@ class InstalledAppsRepository(private val context: Context) {
             dao.removeKnownPackage(pkg)
         }
 
-        if (hasUsage) {
+        if (hasUsage || activity.isNotEmpty()) {
             val installedAll = installedPackageNames()
             val logged = dao.getRecentUninstalls(0L).map { it.packageName }.toSet()
             // an app that was reinstalled should leave the deleted list
