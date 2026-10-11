@@ -5,22 +5,25 @@ import android.content.Context
 import android.content.Intent
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.example.appaudit.LiveLog
 import com.example.appaudit.worker.UninstallCheckWorker
 
-/**
- * Fires as soon as ANY app is installed/removed/updated on the device,
- * so an uninstall gets logged immediately instead of waiting up to
- * 15 minutes for the next periodic scan.
- */
+/** Logs install/uninstall/update events live and triggers an immediate audit scan. */
 class PackageChangeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        val pkg = intent.data?.schemeSpecificPart
+        val replacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
+
         when (intent.action) {
-            Intent.ACTION_PACKAGE_ADDED,
-            Intent.ACTION_PACKAGE_REMOVED,
-            Intent.ACTION_PACKAGE_REPLACED -> {
-                val request = OneTimeWorkRequestBuilder<UninstallCheckWorker>().build()
-                WorkManager.getInstance(context).enqueue(request)
-            }
+            Intent.ACTION_PACKAGE_ADDED ->
+                if (!replacing && pkg != null) LiveLog.add(context, "INSTALLED", pkg)
+            Intent.ACTION_PACKAGE_REPLACED ->
+                if (pkg != null) LiveLog.add(context, "UPDATED", pkg)
+            Intent.ACTION_PACKAGE_FULLY_REMOVED ->
+                if (pkg != null) LiveLog.add(context, "UNINSTALLED", pkg)
+            else -> Unit
         }
+
+        WorkManager.getInstance(context).enqueue(OneTimeWorkRequestBuilder<UninstallCheckWorker>().build())
     }
 }

@@ -22,51 +22,78 @@ class InstalledAppsRepository(private val context: Context) {
             pm.getInstalledApplications(0)
         }
         return apps
-            .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 } // skip preloaded system apps
+            .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 }
             .associate { it.packageName to it.loadLabel(pm).toString() }
     }
 
+    private fun isInstalled(pkg: String): Boolean = try {
+        @Suppress("DEPRECATION")
+        pm.getPackageInfo(pkg, 0)
+        true
+    } catch (e: PackageManager.NameNotFoundException) {
+        false
+    }
+
+    private fun prettyName(pkg: String): String {
+        val parts = pkg.split('.').filter { it.isNotBlank() }
+        val skip = setOf("com", "org", "net", "io", "android", "app", "apps", "mobile")
+        val word = parts.lastOrNull { it !in skip } ?: pkg
+        return word.replaceFirstChar { it.uppercase() }
+    }
+
     /**
-     * The actual "audit" step:
-     *  1. Compare the live install list against the last saved snapshot.
-     *  2. Anything that vanished gets looked up in UsageStatsManager history
-     *     and written to uninstalled_apps.
-     *  3. The snapshot is refreshed with whatever is newly installed.
+     * 1. Snapshot diff: apps we saw before that are gone now.
+     * 2. History scan: apps the OS shows as used in the last 30 days that are
+     *    not installed anymore (works instantly, even on first launch).
      */
     suspend fun runAuditScan() {
+        val now = System.currentTimeMillis()
         val known = dao.getAllKnownPackages().associateBy { it.packageName }
         val current = currentlyInstalled()
+        val hasUsage = UsageStatsHelper.hasUsageAccess(context)
+        val activity = if (hasUsage) {
+            UsageStatsHelper.queryActivity(context, now - 30L * 24 * 60 * 60 * 1000, now)
+        } else emptyMap()
 
         val disappeared = known.keys - current.keys
-        if (disappeared.isNotEmpty()) {
-            val now = System.currentTimeMillis()
-            val lookbackStart = now - 30L * 24 * 60 * 60 * 1000 // 30-day max retained
+        disappeared.forEach { pkg ->
+            val info = known.getValue(pkg)
+            val stats = activity[pkg]
+            dao.insertUninstalledApp(
+                UninstalledApp(
+                    packageName = pkg,
+                    appLabel = info.appLabel,
+                    firstSeen = stats?.firstActive ?: info.firstSeen,
+                    lastActive = stats?.lastActive ?: info.firstSeen,
+                    detectedAt = now,
+                    activeDurationMs = stats?.activeDurationMs ?: 0L,
+                    eventCount = stats?.eventCount ?: 0
+                )
+            )
+            dao.removeKnownPackage(pkg)
+        }
 
-            val activity = if (UsageStatsHelper.hasUsageAccess(context)) {
-                UsageStatsHelper.queryActivity(context, lookbackStart, now)
-            } else emptyMap()
-
-            disappeared.forEach { pkg ->
-                val info = known.getValue(pkg)
-                val stats = activity[pkg]
+        if (hasUsage) {
+            val logged = dao.getRecentUninstalls(0L).map { it.packageName }.toSet()
+            activity.forEach { (pkg, stats) ->
+                if (pkg in logged || pkg in disappeared || pkg == context.packageName) return@forEach
+                if (isInstalled(pkg)) return@forEach
                 dao.insertUninstalledApp(
                     UninstalledApp(
                         packageName = pkg,
-                        appLabel = info.appLabel,
-                        firstSeen = stats?.firstActive ?: info.firstSeen,
-                        lastActive = stats?.lastActive ?: info.firstSeen,
+                        appLabel = prettyName(pkg),
+                        firstSeen = stats.firstActive,
+                        lastActive = stats.lastActive,
                         detectedAt = now,
-                        activeDurationMs = stats?.activeDurationMs ?: 0L,
-                        eventCount = stats?.eventCount ?: 0
+                        activeDurationMs = stats.activeDurationMs,
+                        eventCount = stats.eventCount
                     )
                 )
-                dao.removeKnownPackage(pkg)
             }
         }
 
         val newOnes = current.keys - known.keys
         if (newOnes.isNotEmpty()) {
-            val now = System.currentTimeMillis()
             dao.insertKnownPackages(newOnes.map { KnownPackage(it, current.getValue(it), now) })
         }
     }
