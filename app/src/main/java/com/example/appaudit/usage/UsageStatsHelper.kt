@@ -2,6 +2,7 @@ package com.example.appaudit.usage
 
 import android.app.AppOpsManager
 import android.app.usage.UsageEvents
+import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
@@ -58,49 +59,85 @@ object UsageStatsHelper {
         val eventCount: Int
     )
 
-    /** Replays foreground/background events and summarizes per-package activity (OS keeps ~30 days). */
+    /**
+     * Collects per-package activity between [startTime] and [endTime] from raw events,
+     * the aggregated stats and the daily / weekly / monthly interval buckets.
+     * Packages that were removed from the phone usually still show up here.
+     */
     fun queryActivity(context: Context, startTime: Long, endTime: Long): Map<String, AppActivity> {
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val events = usm.queryEvents(startTime, endTime)
-        val event = UsageEvents.Event()
 
-        val firstActive = HashMap<String, Long>()
-        val lastActive = HashMap<String, Long>()
+        val first = HashMap<String, Long>()
+        val last = HashMap<String, Long>()
         val resumedAt = HashMap<String, Long>()
-        val activeDuration = HashMap<String, Long>()
-        val eventCount = HashMap<String, Int>()
+        val duration = HashMap<String, Long>()
+        val count = HashMap<String, Int>()
 
-        while (events.hasNextEvent()) {
-            events.getNextEvent(event)
-            val pkg = event.packageName ?: continue
-
-            when (event.eventType) {
-                UsageEvents.Event.ACTIVITY_RESUMED,
-                UsageEvents.Event.ACTIVITY_PAUSED,
-                UsageEvents.Event.ACTIVITY_STOPPED -> {
-                    eventCount[pkg] = (eventCount[pkg] ?: 0) + 1
-                    firstActive.putIfAbsent(pkg, event.timeStamp)
-                    lastActive[pkg] = event.timeStamp
-
-                    if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                        resumedAt[pkg] = event.timeStamp
-                    } else {
-                        val start = resumedAt.remove(pkg)
-                        if (start != null && event.timeStamp > start) {
-                            activeDuration[pkg] = (activeDuration[pkg] ?: 0) + (event.timeStamp - start)
+        try {
+            val events = usm.queryEvents(startTime, endTime)
+            val event = UsageEvents.Event()
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                val pkg = event.packageName ?: continue
+                when (event.eventType) {
+                    UsageEvents.Event.ACTIVITY_RESUMED,
+                    UsageEvents.Event.ACTIVITY_PAUSED,
+                    UsageEvents.Event.ACTIVITY_STOPPED -> {
+                        count[pkg] = (count[pkg] ?: 0) + 1
+                        first.putIfAbsent(pkg, event.timeStamp)
+                        last[pkg] = event.timeStamp
+                        if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+                            resumedAt[pkg] = event.timeStamp
+                        } else {
+                            val start = resumedAt.remove(pkg)
+                            if (start != null && event.timeStamp > start) {
+                                duration[pkg] = (duration[pkg] ?: 0L) + (event.timeStamp - start)
+                            }
                         }
                     }
                 }
             }
+        } catch (e: Exception) {
+            // fall through to the aggregated stats below
         }
 
-        return firstActive.keys.associateWith { pkg ->
+        fun merge(stats: Collection<UsageStats>) {
+            for (st in stats) {
+                val pkg = st.packageName ?: continue
+                val used = st.lastTimeUsed
+                if (used < startTime && !count.containsKey(pkg)) continue
+                if (used >= startTime) {
+                    last[pkg] = maxOf(last[pkg] ?: 0L, used)
+                    val begin = if (st.firstTimeStamp in startTime..used) st.firstTimeStamp else used
+                    first[pkg] = minOf(first[pkg] ?: Long.MAX_VALUE, begin)
+                }
+                duration[pkg] = maxOf(duration[pkg] ?: 0L, st.totalTimeInForeground)
+            }
+        }
+
+        try {
+            merge(usm.queryAndAggregateUsageStats(startTime, endTime).values)
+        } catch (e: Exception) {
+        }
+        val intervals = intArrayOf(
+            UsageStatsManager.INTERVAL_DAILY,
+            UsageStatsManager.INTERVAL_WEEKLY,
+            UsageStatsManager.INTERVAL_MONTHLY
+        )
+        for (interval in intervals) {
+            try {
+                usm.queryUsageStats(interval, startTime, endTime)?.let { merge(it) }
+            } catch (e: Exception) {
+            }
+        }
+
+        return (first.keys + last.keys).associateWith { pkg ->
             AppActivity(
                 packageName = pkg,
-                firstActive = firstActive[pkg] ?: 0L,
-                lastActive = lastActive[pkg] ?: 0L,
-                activeDurationMs = activeDuration[pkg] ?: 0L,
-                eventCount = eventCount[pkg] ?: 0
+                firstActive = first[pkg] ?: last[pkg] ?: 0L,
+                lastActive = last[pkg] ?: first[pkg] ?: 0L,
+                activeDurationMs = duration[pkg] ?: 0L,
+                eventCount = count[pkg] ?: 0
             )
         }
     }

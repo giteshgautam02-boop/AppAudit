@@ -205,6 +205,7 @@ fun AuditScreen() {
     var apks by remember { mutableStateOf(listOf<ApkFile>()) }
     var live by remember { mutableStateOf(listOf<LiveEvent>()) }
     var scanning by remember { mutableStateOf(false) }
+    var scanError by remember { mutableStateOf<String?>(null) }
     var range by remember { mutableStateOf(Range.D30) }
     var tab by remember { mutableStateOf(0) }
     var query by remember { mutableStateOf("") }
@@ -228,6 +229,7 @@ fun AuditScreen() {
         if (scanning) return
         scope.launch {
             scanning = true
+            scanError = null
             try {
                 val since = System.currentTimeMillis() - 30 * DAY_MS
                 val result = withContext(Dispatchers.IO) {
@@ -238,7 +240,7 @@ fun AuditScreen() {
                 apks = result.second
                 live = result.third
             } catch (e: Exception) {
-                // keep previous data
+                scanError = "${e.javaClass.simpleName}: ${e.message}"
             } finally {
                 scanning = false
             }
@@ -331,7 +333,7 @@ fun AuditScreen() {
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     when (tab) {
                         0 -> DeletedTab(
-                            shown, query, { query = it }, scanning,
+                            shown, query, { query = it }, scanning, scanError,
                             onCopy = { copy("${it.appLabel}\n${it.packageName}") },
                             onTimeline = { timelineApp = it }
                         )
@@ -433,10 +435,10 @@ private fun PermissionPanel(onOpen: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(16.dp).panel().padding(20.dp)) {
         Text(">_ PERMISSION REQUIRED", color = Red, fontFamily = Mono, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(12.dp))
-        Text("Uninstalled apps ka pata lagane ke liye Usage Access allow karna padega.", color = Color.White)
+        Text("Usage Access is required to detect uninstalled apps.", color = Color.White)
         Spacer(Modifier.height(12.dp))
         Text(
-            "1. Neeche button dabao\n2. List me Arthur Audit pe tap karo\n3. Toggle ON karo\n4. Back dabake wapas aao",
+            "1. Tap the button below\n2. Select Arthur Audit from the list\n3. Turn the toggle ON\n4. Press back to return",
             color = Dim, fontFamily = Mono, fontSize = 13.sp
         )
         Spacer(Modifier.height(16.dp))
@@ -449,7 +451,7 @@ private fun PermissionPanel(onOpen: () -> Unit) {
 
 @Composable
 private fun DeletedTab(
-    apps: List<UninstalledApp>, query: String, onQuery: (String) -> Unit, scanning: Boolean,
+    apps: List<UninstalledApp>, query: String, onQuery: (String) -> Unit, scanning: Boolean, error: String?,
     onCopy: (UninstalledApp) -> Unit, onTimeline: (UninstalledApp) -> Unit
 ) {
     LazyColumn(
@@ -477,10 +479,13 @@ private fun DeletedTab(
                 color = Red, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 15.sp
             )
         }
+        if (error != null) {
+            item { Text("Scan error: $error", color = Red, fontFamily = Mono, fontSize = 12.sp) }
+        }
         if (apps.isEmpty()) {
             item {
                 Text(
-                    if (scanning) "Scanning..." else "Is time window me koi uninstalled app nahi mili.",
+                    if (scanning) "Scanning..." else "No uninstalled apps found in the selected window.",
                     color = Dim, fontFamily = Mono, textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth().padding(top = 32.dp)
                 )
@@ -549,9 +554,9 @@ private fun ApkTab(hasStorage: Boolean, apks: List<ApkFile>, onGrant: () -> Unit
             Modifier.fillMaxSize().padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
         ) {
-            Text("Storage access chahiye", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Storage access required", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
-            Text("Leftover .apk files dhundne ke liye All files access allow karo.", color = Dim, textAlign = TextAlign.Center)
+            Text("Allow All files access to scan for leftover .apk installers.", color = Dim, textAlign = TextAlign.Center)
             Spacer(Modifier.height(16.dp))
             Button(onClick = onGrant, colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.Black)) {
                 Text("Grant access")
@@ -598,7 +603,7 @@ private fun LiveTab(events: List<LiveEvent>) {
             Text("No Live Events Yet", fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Jab bhi koi app install, update ya uninstall hogi, wo yahan live log ho jayegi.",
+                "Install, update and uninstall events are logged here in real time.",
                 color = Dim, textAlign = TextAlign.Center
             )
         }

@@ -26,6 +26,16 @@ class InstalledAppsRepository(private val context: Context) {
             .associate { it.packageName to it.loadLabel(pm).toString() }
     }
 
+    private fun installedPackageNames(): Set<String> {
+        val list = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(0L))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getInstalledPackages(0)
+        }
+        return list.map { it.packageName }.toSet()
+    }
+
     private fun isInstalled(pkg: String): Boolean = try {
         @Suppress("DEPRECATION")
         pm.getPackageInfo(pkg, 0)
@@ -74,10 +84,13 @@ class InstalledAppsRepository(private val context: Context) {
         }
 
         if (hasUsage) {
+            val installedAll = installedPackageNames()
             val logged = dao.getRecentUninstalls(0L).map { it.packageName }.toSet()
+            // an app that was reinstalled should leave the deleted list
+            logged.filter { it in installedAll }.forEach { dao.removeUninstalled(it) }
             activity.forEach { (pkg, stats) ->
                 if (pkg in logged || pkg in disappeared || pkg == context.packageName) return@forEach
-                if (isInstalled(pkg)) return@forEach
+                if (pkg in installedAll || isInstalled(pkg)) return@forEach
                 dao.insertUninstalledApp(
                     UninstalledApp(
                         packageName = pkg,

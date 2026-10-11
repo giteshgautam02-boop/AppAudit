@@ -20,6 +20,9 @@ interface TrackedAppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUninstalledApp(app: UninstalledApp)
 
+    @Query("DELETE FROM uninstalled_apps WHERE packageName = :packageName")
+    suspend fun removeUninstalled(packageName: String)
+
     @Query("SELECT * FROM uninstalled_apps WHERE detectedAt >= :since ORDER BY detectedAt DESC")
     suspend fun getRecentUninstalls(since: Long): List<UninstalledApp>
 }
