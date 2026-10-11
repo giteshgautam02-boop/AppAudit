@@ -7,6 +7,7 @@ import android.os.Build
 import com.example.appaudit.data.AppDatabase
 import com.example.appaudit.data.KnownPackage
 import com.example.appaudit.data.UninstalledApp
+import com.example.appaudit.usage.MediaOwnerReader
 import com.example.appaudit.usage.UsageDumpReader
 import com.example.appaudit.usage.UsageStatsHelper
 
@@ -78,8 +79,12 @@ class InstalledAppsRepository(private val context: Context) {
         // Optional bonus only — if Shizuku/root is present we get a bit more history
         val fromDump = try { UsageDumpReader.readActivity() } catch (_: Throwable) { emptyMap() }
 
-        // API is primary; dumpsys only fills gaps
-        val activity = fromDump + fromApi
+        // No-root source: MediaStore remembers which app created each file, even after uninstall.
+        // This is what finds apps that were deleted BEFORE this audit app was installed.
+        val fromMedia = try { MediaOwnerReader.readActivity(context) } catch (_: Throwable) { emptyMap() }
+
+        // API is primary; dumpsys and MediaStore only fill gaps
+        val activity = fromMedia + fromDump + fromApi
 
         // ----- 1) Snapshot diff (works for recent uninstalls, even 1 sec ago) -----
         val disappeared = known.keys - current.keys
@@ -111,6 +116,7 @@ class InstalledAppsRepository(private val context: Context) {
 
             activity.forEach { (pkg, stats) ->
                 if (pkg in logged || pkg in disappeared || pkg == context.packageName) return@forEach
+                if (pkg == "android" || pkg.startsWith("com.google.android.gms") || pkg.startsWith("com.android.systemui")) return@forEach
                 if (pkg in installedAll || isInstalled(pkg)) return@forEach
                 dao.insertUninstalledApp(
                     UninstalledApp(
@@ -133,6 +139,6 @@ class InstalledAppsRepository(private val context: Context) {
         }
     }
 
-    suspend fun recentUninstalls(withinDays: Int = 30) =
+    suspend fun recentUninstalls(withinDays: Int = 3650) =
         dao.getRecentUninstalls(System.currentTimeMillis() - withinDays * 24L * 60 * 60 * 1000)
 }

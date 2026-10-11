@@ -17,6 +17,10 @@ object UsageDumpReader {
 
     // time="2026-10-10 12:34:56" type=ACTIVITY_RESUMED package=com.foo class=...
     private val ev = Regex("""time="(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})[^"]*"\s+type=(\w+)\s+package=(\S+)""")
+    // Interval summaries (daily/weekly/monthly/yearly) come from the same usagestats files and go
+    // back much further than the raw events:
+    //   package=com.foo totalTimeUsed="..." lastTimeUsed="2026-03-02 18:20:11" ...   (older: lastTime=)
+    private val summary = Regex("""package=(\S+)\s.*?lastTime(?:Used)?="?(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})""")
     private val resumed = setOf("ACTIVITY_RESUMED", "MOVE_TO_FOREGROUND")
     private val ended = setOf("ACTIVITY_PAUSED", "ACTIVITY_STOPPED", "MOVE_TO_BACKGROUND")
 
@@ -26,7 +30,7 @@ object UsageDumpReader {
 
         // grep keeps only event lines, so the (very large) dump stays small.
         val out = ShellAccess.exec(
-            "dumpsys usagestats | grep -E 'time=.*type=(ACTIVITY_|MOVE_TO_)'", mode, 60
+            "dumpsys usagestats | grep -E 'time=.*type=(ACTIVITY_|MOVE_TO_)|package=.*lastTime'", mode, 90
         ) ?: return emptyMap()
 
         val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
@@ -49,6 +53,15 @@ object UsageDumpReader {
                 val s = resumedAt.remove(pkg)
                 if (s != null && t > s) duration[pkg] = (duration[pkg] ?: 0L) + (t - s)
             }
+        }
+
+        // Older history from the interval summaries (only fills what events did not cover).
+        for (m in summary.findAll(out)) {
+            val (pkg, timeStr) = m.destructured
+            val t = try { fmt.parse(timeStr)?.time } catch (_: Exception) { null } ?: continue
+            if (t <= 0L) continue
+            if (pkg !in first || t < first.getValue(pkg)) first[pkg] = t
+            if (pkg !in last || t > last.getValue(pkg)) last[pkg] = t
         }
 
         return first.keys.associateWith { pkg ->

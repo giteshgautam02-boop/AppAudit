@@ -104,7 +104,9 @@ private val Mono = FontFamily.Monospace
 private val Round = RoundedCornerShape(16.dp)
 
 enum class Range(val label: String, val ms: Long, val short: String) {
-    D30("30 Days (Max)", 30 * DAY_MS, "30 Days (Max)"),
+    Y1("1 Year", 365 * DAY_MS, "1 Year"),
+    D90("90 Days", 90 * DAY_MS, "90 Days"),
+    D30("30 Days", 30 * DAY_MS, "30 Days"),
     D15("15 Days", 15 * DAY_MS, "15 Days"),
     D7("7 Days", 7 * DAY_MS, "7 Days"),
     D3("3 Days (72h)", 3 * DAY_MS, "3 Days (72h)"),
@@ -208,7 +210,7 @@ fun AuditScreen() {
     var live by remember { mutableStateOf(listOf<LiveEvent>()) }
     var scanning by remember { mutableStateOf(false) }
     var scanError by remember { mutableStateOf<String?>(null) }
-    var range by remember { mutableStateOf(Range.D30) }
+    var range by remember { mutableStateOf(Range.Y1) }
     var tab by remember { mutableStateOf(0) }
     var query by remember { mutableStateOf("") }
     var showAbout by remember { mutableStateOf(false) }

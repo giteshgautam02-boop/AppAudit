@@ -51,6 +51,20 @@ object UsageStatsHelper {
         }
     }
 
+    /** Hidden API (Android 10+), read via reflection; null when the phone blocks it. */
+    private fun taskRootPackage(event: UsageEvents.Event): String? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+        return try {
+            UsageEvents.Event::class.java.getMethod("getTaskRootPackageName").invoke(event) as? String
+        } catch (_: Throwable) {
+            try {
+                val f = UsageEvents.Event::class.java.getDeclaredField("mTaskRootPackage")
+                f.isAccessible = true
+                f.get(event) as? String
+            } catch (_: Throwable) { null }
+        }
+    }
+
     data class AppActivity(
         val packageName: String,
         val firstActive: Long,
@@ -83,6 +97,13 @@ object UsageStatsHelper {
                 count[pkg] = (count[pkg] ?: 0) + 1
                 first.putIfAbsent(pkg, ts)
                 last[pkg] = maxOf(last[pkg] ?: 0L, ts)
+                // An uninstalled app can still appear as the task root of another app's activity.
+                val root = taskRootPackage(event)
+                if (root != null && root != pkg) {
+                    count[root] = (count[root] ?: 0) + 1
+                    first.putIfAbsent(root, ts)
+                    last[root] = maxOf(last[root] ?: 0L, ts)
+                }
                 when (event.eventType) {
                     UsageEvents.Event.ACTIVITY_RESUMED -> resumedAt[pkg] = ts
                     UsageEvents.Event.ACTIVITY_PAUSED,
@@ -102,11 +123,17 @@ object UsageStatsHelper {
             for (st in stats) {
                 val pkg = st.packageName ?: continue
                 val used = st.lastTimeUsed
-                if (used < startTime && !count.containsKey(pkg)) continue
-                if (used >= startTime) {
+                if (used > 0 && used >= startTime) {
                     last[pkg] = maxOf(last[pkg] ?: 0L, used)
                     val begin = if (st.firstTimeStamp in startTime..used) st.firstTimeStamp else used
                     first[pkg] = minOf(first[pkg] ?: Long.MAX_VALUE, begin)
+                } else if (!count.containsKey(pkg) && !last.containsKey(pkg)) {
+                    // The package IS in the system's usage history but has no recorded launch time
+                    // (very common for apps that were later uninstalled). Don't drop it - the old
+                    // code skipped these, which is why many deleted apps never showed up.
+                    val t = maxOf(st.firstTimeStamp, startTime)
+                    first[pkg] = t
+                    last[pkg] = t
                 }
                 duration[pkg] = maxOf(duration[pkg] ?: 0L, st.totalTimeInForeground)
             }
