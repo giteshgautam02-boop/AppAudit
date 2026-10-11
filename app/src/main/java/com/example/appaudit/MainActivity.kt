@@ -78,6 +78,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.example.appaudit.system.SystemPackageReader
 import com.example.appaudit.data.UninstalledApp
 import com.example.appaudit.repository.InstalledAppsRepository
 import com.example.appaudit.usage.UsageStatsHelper
@@ -317,7 +318,7 @@ fun AuditScreen() {
                 }
                 Spacer(Modifier.height(10.dp))
 
-                val titles = listOf("Deleted Apps", "Residual APKs", "Live Monitor", "Full Report")
+                val titles = listOf("Deleted Apps", "Residual APKs", "Live Monitor", "System Packages", "Full Report")
                 TabRow(selectedTabIndex = tab, containerColor = Bg, contentColor = Green) {
                     titles.forEachIndexed { i, t ->
                         Tab(selected = tab == i, onClick = { tab = i }, text = {
@@ -339,6 +340,7 @@ fun AuditScreen() {
                         )
                         1 -> ApkTab(hasStorage, apksInRange) { ApkScanner.openSettings(context) }
                         2 -> LiveTab(liveInRange)
+                        3 -> SystemPackagesTab()
                         else -> {
                             val report = buildReport(range, inRange, apksInRange, liveInRange)
                             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(13.dp)) {
@@ -696,4 +698,75 @@ private fun TimelineDialog(app: UninstalledApp, onClose: () -> Unit) {
             ) { Text("Close", fontWeight = FontWeight.Bold) }
         }
     )
+}
+
+
+@Composable
+private fun SystemPackagesTab() {
+    val scope = rememberCoroutineScope()
+    var result by remember { mutableStateOf<SystemPackageReader.Result?>(null) }
+    var loading by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+
+    Column(Modifier.fillMaxSize().padding(horizontal = 13.dp)) {
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Source: /data/system → packages.list, packages.xml, packages.xml.bak, package_cache. Root required.",
+            color = Dim, fontFamily = Mono, fontSize = 10.sp
+        )
+        Spacer(Modifier.height(8.dp))
+        Box(
+            Modifier.fillMaxWidth().clip(Round).background(Green)
+                .clickable(enabled = !loading) {
+                    scope.launch {
+                        loading = true
+                        result = SystemPackageReader.readAll()
+                        loading = false
+                    }
+                }.padding(vertical = 13.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                if (loading) "Reading…" else "Read System Packages",
+                color = Color.Black, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+
+        val r = result
+        if (r == null) {
+            Text("Button dabao — 4 files ek list mein merge hongi.", color = Dim)
+        } else {
+            r.status.forEach { Text(it, color = if (r.rootAvailable) Cyan else Red, fontFamily = Mono, fontSize = 10.5.sp) }
+            val shown = r.packages.filter { query.isBlank() || it.packageName.contains(query, ignoreCase = true) }
+            if (r.packages.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    value = query, onValueChange = { query = it }, singleLine = true,
+                    placeholder = { Text("Search package…", color = Dim) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(4.dp))
+                Text("Total (merged): ${shown.size} / ${r.packages.size}", color = Green, fontFamily = Mono, fontSize = 11.sp)
+                Spacer(Modifier.height(6.dp))
+            }
+            LazyColumn(
+                contentPadding = PaddingValues(bottom = 77.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(shown) { p ->
+                    Column(Modifier.fillMaxWidth().panel().padding(11.dp)) {
+                        Text(p.packageName, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("Found in: " + p.sources.joinToString { it.label }, color = Cyan, fontFamily = Mono, fontSize = 10.sp)
+                        p.isSystemApp?.let { Text(if (it) "Type: System app" else "Type: User app", fontFamily = Mono, fontSize = 10.5.sp) }
+                        p.uid?.let { Text("UID: $it", color = Dim, fontFamily = Mono, fontSize = 10.sp) }
+                        p.versionCode?.let { Text("Version code: $it", color = Dim, fontFamily = Mono, fontSize = 10.sp) }
+                        p.installer?.let { Text("Installer: $it", color = Dim, fontFamily = Mono, fontSize = 10.sp) }
+                        p.codePath?.let { Text("Path: $it", color = Dim, fontFamily = Mono, fontSize = 9.5.sp) }
+                        p.dataDir?.let { Text("Data: $it", color = Dim, fontFamily = Mono, fontSize = 9.5.sp) }
+                    }
+                }
+            }
+        }
+    }
 }
