@@ -13,7 +13,7 @@
     <application
         android:name=".AppAuditApplication"
         android:allowBackup="true"
-        android:label="Arthur Audit"
+        android:label="Devil Audit"
         android:theme="@android:style/Theme.Material.NoActionBar">
 
         <activity

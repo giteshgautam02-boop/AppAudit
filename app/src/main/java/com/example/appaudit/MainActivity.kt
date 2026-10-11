@@ -160,9 +160,9 @@ private fun buildReport(
     fun row2(k: String, v: String) { sb.append("  ").append(k.padEnd(16)).append(": ").append(v).append('\n') }
 
     sb.append(eq).append('\n').append("         SYSTEM APPLICATION AUDIT REPORT\n").append(eq).append('\n')
-    row("Application", "Arthur Audit v2.0")
+    row("Application", "Devil Audit v2.0")
     row("Developer", "Devil")
-    row("Team / Org", "Team Arthur")
+    row("Team / Org", "Team Devil")
     row("Device Model", Build.MODEL)
     row("Android Version", "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
     row("Security Patch", Build.VERSION.SECURITY_PATCH ?: "n/a")
@@ -188,7 +188,7 @@ private fun buildReport(
     apks.forEach { sb.append("${it.name} (${fmtSize(it.size)})\n  ${it.path}\n  Modified: ${fmt(it.modified)}\n") }
     sb.append('\n').append(dash).append('\n').append("LIVE EVENTS (${live.size})\n").append(dash).append('\n')
     live.forEach { sb.append("${fmt(it.time)}  [${it.type}]  ${it.pkg}\n") }
-    sb.append('\n').append("Team Arthur • Created by Devil\n")
+    sb.append('\n').append("Team Devil • Created by Devil\n")
     return sb.toString()
 }
 
@@ -272,9 +272,9 @@ fun AuditScreen() {
         containerColor = Bg,
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { scan() }, containerColor = Green, contentColor = Color.Black, shape = CircleShape
+                onClick = { scan() }, modifier = Modifier.size(48.dp), containerColor = Green, contentColor = Color.Black, shape = CircleShape
             ) {
-                if (scanning) CircularProgressIndicator(Modifier.size(24.dp), color = Color.Black, strokeWidth = 2.dp)
+                if (scanning) CircularProgressIndicator(Modifier.size(19.dp), color = Color.Black, strokeWidth = 2.dp)
                 else Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
             }
         }
@@ -289,8 +289,8 @@ fun AuditScreen() {
                 PermissionPanel { UsageStatsHelper.openUsageAccessSettings(context) }
             } else {
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    contentPadding = PaddingValues(horizontal = 13.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(Range.values().toList()) { r ->
                         val sel = r == range
@@ -300,29 +300,29 @@ fun AuditScreen() {
                                 .background(if (sel) Green else Panel)
                                 .border(1.dp, if (sel) Green else Border, shape)
                                 .clickable { range = r }
-                                .padding(horizontal = 18.dp, vertical = 12.dp)
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
-                            Text(r.label, color = if (sel) Color.Black else Dim, fontFamily = Mono, fontSize = 15.sp)
+                            Text(r.label, color = if (sel) Color.Black else Dim, fontFamily = Mono, fontSize = 12.sp)
                         }
                     }
                 }
 
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    Modifier.fillMaxWidth().padding(horizontal = 13.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     StatCard("${inRange.size}", "Deleted Apps", Red, Modifier.weight(1f))
                     StatCard("${apksInRange.size}", "Residual APKs", Green, Modifier.weight(1f))
                     StatCard("${liveInRange.size}", "Live Logged", Green, Modifier.weight(1f))
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(10.dp))
 
                 val titles = listOf("Deleted Apps", "Residual APKs", "Live Monitor", "Full Report")
                 TabRow(selectedTabIndex = tab, containerColor = Bg, contentColor = Green) {
                     titles.forEachIndexed { i, t ->
                         Tab(selected = tab == i, onClick = { tab = i }, text = {
                             Text(
-                                t, color = if (tab == i) Green else Dim, fontFamily = Mono, fontSize = 14.sp,
+                                t, color = if (tab == i) Green else Dim, fontFamily = Mono, fontSize = 11.sp,
                                 fontWeight = if (tab == i) FontWeight.Bold else FontWeight.Normal,
                                 textAlign = TextAlign.Center, maxLines = 2
                             )
@@ -341,39 +341,39 @@ fun AuditScreen() {
                         2 -> LiveTab(liveInRange)
                         else -> {
                             val report = buildReport(range, inRange, apksInRange, liveInRange)
-                            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(13.dp)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                     Row(
                                         Modifier.weight(1f).clip(Round).border(1.dp, Dim, Round)
-                                            .clickable { copy(report) }.padding(vertical = 16.dp),
+                                            .clickable { copy(report) }.padding(vertical = 13.dp),
                                         horizontalArrangement = Arrangement.Center,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(Icons.Filled.ContentCopy, null, tint = Color.White, modifier = Modifier.size(20.dp))
-                                        Spacer(Modifier.width(8.dp))
-                                        Text("Copy Log", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                                        Icon(Icons.Filled.ContentCopy, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Copy Log", fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
                                     }
                                     Row(
                                         Modifier.weight(1f).clip(Round).background(Green)
-                                            .clickable { share(report) }.padding(vertical = 16.dp),
+                                            .clickable { share(report) }.padding(vertical = 13.dp),
                                         horizontalArrangement = Arrangement.Center,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(Icons.Filled.Share, null, tint = Color.Black, modifier = Modifier.size(20.dp))
-                                        Spacer(Modifier.width(8.dp))
-                                        Text("Share Log", color = Color.Black, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                                        Icon(Icons.Filled.Share, null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Share Log", color = Color.Black, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
                                     }
                                 }
-                                Spacer(Modifier.height(16.dp))
-                                Box(Modifier.fillMaxWidth().panel().padding(14.dp)) {
-                                    Text(report, fontFamily = Mono, fontSize = 12.sp, color = Color(0xFFD0D0D8))
+                                Spacer(Modifier.height(13.dp))
+                                Box(Modifier.fillMaxWidth().panel().padding(11.dp)) {
+                                    Text(report, fontFamily = Mono, fontSize = 9.5.sp, color = Color(0xFFD0D0D8))
                                 }
-                                Spacer(Modifier.height(16.dp))
+                                Spacer(Modifier.height(13.dp))
                                 Text(
-                                    "Team Arthur • Created by Devil", color = Dim, fontSize = 13.sp,
+                                    "Team Devil • Created by Devil", color = Dim, fontSize = 10.5.sp,
                                     modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center
                                 )
-                                Spacer(Modifier.height(88.dp))
+                                Spacer(Modifier.height(70.dp))
                             }
                         }
                     }
@@ -389,22 +389,22 @@ fun AuditScreen() {
 @Composable
 private fun Header(onInfo: () -> Unit, onShield: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
+        Modifier.fillMaxWidth().padding(start = 13.dp, end = 6.dp, top = 10.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(Panel),
+            Modifier.size(35.dp).clip(RoundedCornerShape(10.dp)).background(Panel),
             contentAlignment = Alignment.Center
-        ) { Icon(Icons.Filled.Search, null, tint = Color(0xFF3B9EFF), modifier = Modifier.size(24.dp)) }
-        Spacer(Modifier.width(12.dp))
+        ) { Icon(Icons.Filled.Search, null, tint = Color(0xFF3B9EFF), modifier = Modifier.size(19.dp)) }
+        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Arthur Audit", fontFamily = Mono, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(8.dp))
+                Text("Devil Audit", maxLines = 1, softWrap = false, fontFamily = Mono, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(6.dp))
                 Box(
                     Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF0A2A17))
-                        .border(1.dp, Green, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 4.dp)
-                ) { Text("SYS_AUDIT", color = Green, fontFamily = Mono, fontSize = 11.sp) }
+                        .border(1.dp, Green, RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 4.dp)
+                ) { Text("SYS_AUDIT", maxLines = 1, softWrap = false, color = Green, fontFamily = Mono, fontSize = 9.sp) }
             }
             Text(
                 buildAnnotatedString {
@@ -412,9 +412,9 @@ private fun Header(onInfo: () -> Unit, onShield: () -> Unit) {
                     withStyle(SpanStyle(color = Dim)) { append(" • ") }
                     withStyle(SpanStyle(color = Cyan)) { append("Devil") }
                     withStyle(SpanStyle(color = Dim)) { append(" • ") }
-                    withStyle(SpanStyle(color = Cyan)) { append("Team Arthur") }
+                    withStyle(SpanStyle(color = Cyan)) { append("Team Devil") }
                 },
-                fontFamily = Mono, fontSize = 12.sp
+                fontFamily = Mono, fontSize = 9.5.sp
             )
         }
         IconButton(onClick = onInfo) { Icon(Icons.Filled.Info, "About", tint = Dim) }
@@ -424,24 +424,24 @@ private fun Header(onInfo: () -> Unit, onShield: () -> Unit) {
 
 @Composable
 private fun StatCard(value: String, label: String, color: Color, modifier: Modifier) {
-    Column(modifier.panel().padding(14.dp)) {
-        Text(value, color = color, fontFamily = Mono, fontSize = 30.sp, fontWeight = FontWeight.Bold)
-        Text(label, color = Dim, fontFamily = Mono, fontSize = 12.sp, maxLines = 1)
+    Column(modifier.panel().padding(11.dp)) {
+        Text(value, color = color, fontFamily = Mono, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = Dim, fontFamily = Mono, fontSize = 9.5.sp, maxLines = 1, softWrap = false)
     }
 }
 
 @Composable
 private fun PermissionPanel(onOpen: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(16.dp).panel().padding(20.dp)) {
+    Column(Modifier.fillMaxWidth().padding(13.dp).panel().padding(16.dp)) {
         Text(">_ PERMISSION REQUIRED", color = Red, fontFamily = Mono, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
         Text("Usage Access is required to detect uninstalled apps.", color = Color.White)
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
         Text(
-            "1. Tap the button below\n2. Select Arthur Audit from the list\n3. Turn the toggle ON\n4. Press back to return",
-            color = Dim, fontFamily = Mono, fontSize = 13.sp
+            "1. Tap the button below\n2. Select Devil Audit from the list\n3. Turn the toggle ON\n4. Press back to return",
+            color = Dim, fontFamily = Mono, fontSize = 10.5.sp
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(13.dp))
         Button(
             onClick = onOpen, modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.Black)
@@ -455,8 +455,8 @@ private fun DeletedTab(
     onCopy: (UninstalledApp) -> Unit, onTimeline: (UninstalledApp) -> Unit
 ) {
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        contentPadding = PaddingValues(start = 13.dp, end = 13.dp, top = 13.dp, bottom = 77.dp),
+        verticalArrangement = Arrangement.spacedBy(11.dp)
     ) {
         item {
             OutlinedTextField(
@@ -464,8 +464,8 @@ private fun DeletedTab(
                 modifier = Modifier.fillMaxWidth(),
                 shape = Round,
                 leadingIcon = { Icon(Icons.Filled.Search, null, tint = Cyan) },
-                placeholder = { Text("filter pkg or name...", color = Dim, fontFamily = Mono, fontSize = 14.sp) },
-                textStyle = androidx.compose.ui.text.TextStyle(fontFamily = Mono, fontSize = 15.sp),
+                placeholder = { Text("filter pkg or name...", color = Dim, fontFamily = Mono, fontSize = 11.sp) },
+                textStyle = androidx.compose.ui.text.TextStyle(fontFamily = Mono, fontSize = 12.sp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = Color.White, unfocusedTextColor = Color.White,
                     focusedBorderColor = Green, unfocusedBorderColor = Border,
@@ -476,18 +476,18 @@ private fun DeletedTab(
         item {
             Text(
                 ">_ UNINSTALLED PACKAGES DETECTED [${apps.size}]",
-                color = Red, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 15.sp
+                color = Red, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 12.sp
             )
         }
         if (error != null) {
-            item { Text("Scan error: $error", color = Red, fontFamily = Mono, fontSize = 12.sp) }
+            item { Text("Scan error: $error", color = Red, fontFamily = Mono, fontSize = 9.5.sp) }
         }
         if (apps.isEmpty()) {
             item {
                 Text(
                     if (scanning) "Scanning..." else "No uninstalled apps found in the selected window.",
                     color = Dim, fontFamily = Mono, textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(top = 32.dp)
+                    modifier = Modifier.fillMaxWidth().padding(top = 26.dp)
                 )
             }
         }
@@ -499,34 +499,34 @@ private fun DeletedTab(
 
 @Composable
 private fun DeletedCard(app: UninstalledApp, onCopy: () -> Unit, onTimeline: () -> Unit) {
-    Column(Modifier.fillMaxWidth().panel(RedDark, Color(0xFF0F0F12)).padding(16.dp)) {
+    Column(Modifier.fillMaxWidth().panel(RedDark, Color(0xFF0F0F12)).padding(13.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Box(
                 Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF3A1420))
-                    .border(1.dp, RedDark, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 8.dp)
-            ) { Text("[STATUS: UNINSTALLED]", color = Red, fontFamily = Mono, fontSize = 12.sp) }
-            Text("Active ${rel(app.lastActive)}", color = Red, fontFamily = Mono, fontSize = 13.sp)
+                    .border(1.dp, RedDark, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 6.dp)
+            ) { Text("[STATUS: UNINSTALLED]", color = Red, fontFamily = Mono, fontSize = 9.5.sp) }
+            Text("Active ${rel(app.lastActive)}", color = Red, fontFamily = Mono, fontSize = 10.5.sp)
         }
-        Spacer(Modifier.height(14.dp))
-        Text("> ${app.appLabel}", fontFamily = Mono, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text(app.packageName, color = Dim, fontFamily = Mono, fontSize = 15.sp)
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(11.dp))
+        Text("> ${app.appLabel}", fontFamily = Mono, fontSize = 17.5.sp, fontWeight = FontWeight.Bold)
+        Text(app.packageName, color = Dim, fontFamily = Mono, fontSize = 12.sp)
+        Spacer(Modifier.height(11.dp))
         Box(Modifier.fillMaxWidth().height(1.dp).background(Border))
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(11.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
-                Text("LAST ACTIVE", color = Dim, fontFamily = Mono, fontSize = 11.sp, letterSpacing = 1.sp)
-                Spacer(Modifier.height(6.dp))
-                Text(fmt(app.lastActive), fontFamily = Mono, fontSize = 14.sp)
+                Text("LAST ACTIVE", color = Dim, fontFamily = Mono, fontSize = 9.sp, letterSpacing = 1.sp)
+                Spacer(Modifier.height(5.dp))
+                Text(fmt(app.lastActive), fontFamily = Mono, fontSize = 11.sp)
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text("ACTIVE DURATION", color = Dim, fontFamily = Mono, fontSize = 11.sp, letterSpacing = 1.sp)
-                Spacer(Modifier.height(6.dp))
-                Text(fmtDuration(app.activeDurationMs), fontFamily = Mono, fontSize = 14.sp)
+                Text("ACTIVE DURATION", color = Dim, fontFamily = Mono, fontSize = 9.sp, letterSpacing = 1.sp)
+                Spacer(Modifier.height(5.dp))
+                Text(fmtDuration(app.activeDurationMs), fontFamily = Mono, fontSize = 11.sp)
             }
         }
-        Spacer(Modifier.height(14.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
+        Spacer(Modifier.height(11.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
             SmallAction(Icons.Filled.ContentCopy, "Copy", Color.White, onCopy)
             SmallAction(Icons.Filled.ShowChart, "Timeline", Green, onTimeline)
         }
@@ -538,12 +538,12 @@ private fun SmallAction(icon: androidx.compose.ui.graphics.vector.ImageVector, l
     val shape = RoundedCornerShape(12.dp)
     Row(
         Modifier.clip(shape).background(Color(0xFF16161A)).border(1.dp, Border, shape)
-            .clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+            .clickable(onClick = onClick).padding(horizontal = 13.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null, tint = color, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(label, color = color, fontFamily = Mono, fontWeight = FontWeight.SemiBold)
+        Icon(icon, null, tint = color, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, color = color, fontFamily = Mono, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -551,26 +551,26 @@ private fun SmallAction(icon: androidx.compose.ui.graphics.vector.ImageVector, l
 private fun ApkTab(hasStorage: Boolean, apks: List<ApkFile>, onGrant: () -> Unit) {
     if (!hasStorage) {
         Column(
-            Modifier.fillMaxSize().padding(32.dp),
+            Modifier.fillMaxSize().padding(26.dp),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
         ) {
-            Text("Storage access required", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
+            Text("Storage access required", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
             Text("Allow All files access to scan for leftover .apk installers.", color = Dim, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(13.dp))
             Button(onClick = onGrant, colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.Black)) {
                 Text("Grant access")
             }
         }
     } else if (apks.isEmpty()) {
         Column(
-            Modifier.fillMaxSize().padding(32.dp),
+            Modifier.fillMaxSize().padding(26.dp),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
         ) {
-            Icon(Icons.Filled.Folder, null, tint = Dim, modifier = Modifier.size(56.dp))
-            Spacer(Modifier.height(16.dp))
-            Text("No Residual APKs Found", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
+            Icon(Icons.Filled.Folder, null, tint = Dim, modifier = Modifier.size(45.dp))
+            Spacer(Modifier.height(13.dp))
+            Text("No Residual APKs Found", fontSize = 17.5.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
             Text(
                 "No installer files (.apk) were modified or downloaded in storage within the selected audit window.",
                 color = Dim, textAlign = TextAlign.Center
@@ -578,15 +578,15 @@ private fun ApkTab(hasStorage: Boolean, apks: List<ApkFile>, onGrant: () -> Unit
         }
     } else {
         LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(start = 13.dp, end = 13.dp, top = 13.dp, bottom = 77.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(apks, key = { it.path }) { f ->
-                Column(Modifier.fillMaxWidth().panel().padding(14.dp)) {
-                    Text("> ${f.name}", fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text(f.path, color = Dim, fontFamily = Mono, fontSize = 12.sp)
-                    Spacer(Modifier.height(8.dp))
-                    Text("${fmtSize(f.size)}  •  ${fmt(f.modified)}", color = Green, fontFamily = Mono, fontSize = 13.sp)
+                Column(Modifier.fillMaxWidth().panel().padding(11.dp)) {
+                    Text("> ${f.name}", fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text(f.path, color = Dim, fontFamily = Mono, fontSize = 9.5.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text("${fmtSize(f.size)}  •  ${fmt(f.modified)}", color = Green, fontFamily = Mono, fontSize = 10.5.sp)
                 }
             }
         }
@@ -597,11 +597,11 @@ private fun ApkTab(hasStorage: Boolean, apks: List<ApkFile>, onGrant: () -> Unit
 private fun LiveTab(events: List<LiveEvent>) {
     if (events.isEmpty()) {
         Column(
-            Modifier.fillMaxSize().padding(32.dp),
+            Modifier.fillMaxSize().padding(26.dp),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
         ) {
-            Text("No Live Events Yet", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
+            Text("No Live Events Yet", fontSize = 17.5.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
             Text(
                 "Install, update and uninstall events are logged here in real time.",
                 color = Dim, textAlign = TextAlign.Center
@@ -609,15 +609,15 @@ private fun LiveTab(events: List<LiveEvent>) {
         }
     } else {
         LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            contentPadding = PaddingValues(start = 13.dp, end = 13.dp, top = 13.dp, bottom = 77.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(events) { e ->
                 val c = when (e.type) { "UNINSTALLED" -> Red; "INSTALLED" -> Green; else -> Cyan }
-                Column(Modifier.fillMaxWidth().panel().padding(14.dp)) {
+                Column(Modifier.fillMaxWidth().panel().padding(11.dp)) {
                     Text("[${e.type}]", color = c, fontFamily = Mono, fontWeight = FontWeight.Bold)
-                    Text(e.pkg, fontFamily = Mono, fontSize = 15.sp)
-                    Text(fmt(e.time), color = Dim, fontFamily = Mono, fontSize = 12.sp)
+                    Text(e.pkg, fontFamily = Mono, fontSize = 12.sp)
+                    Text(fmt(e.time), color = Dim, fontFamily = Mono, fontSize = 9.5.sp)
                 }
             }
         }
@@ -632,25 +632,25 @@ private fun AboutDialog(onClose: () -> Unit) {
         shape = RoundedCornerShape(28.dp),
         title = {
             Column {
-                Text("Arthur Audit", fontWeight = FontWeight.Bold, fontSize = 26.sp)
+                Text("Devil Audit", fontWeight = FontWeight.Bold, fontSize = 21.sp)
                 Spacer(Modifier.height(4.dp))
-                Text("v2.0 Diagnostic Suite", color = Dim, fontSize = 16.sp)
+                Text("v2.0 Diagnostic Suite", color = Dim, fontSize = 13.sp)
             }
         },
         text = {
             Column {
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF0A0A0C)).padding(16.dp)) {
-                    Text("DEVELOPER", color = Green, fontWeight = FontWeight.Bold, fontSize = 14.sp, letterSpacing = 1.sp)
-                    Spacer(Modifier.height(8.dp))
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(Color(0xFF0A0A0C)).padding(13.dp)) {
+                    Text("DEVELOPER", color = Green, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp)
+                    Spacer(Modifier.height(6.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Devil", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.width(10.dp))
-                        Box(Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF0A2A17)).padding(horizontal = 10.dp, vertical = 6.dp)) {
-                            Text("Team Arthur", color = Green, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text("Devil", fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.width(8.dp))
+                        Box(Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xFF0A2A17)).padding(horizontal = 8.dp, vertical = 5.dp)) {
+                            Text("Team Devil", color = Green, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(13.dp))
                 Text(
                     "Application diagnostic & deletion monitor. Built for real-time system inspection, residual detection, and activity auditing.",
                     color = Color(0xFFC8C8D0)
@@ -674,19 +674,19 @@ private fun TimelineDialog(app: UninstalledApp, onClose: () -> Unit) {
         title = { Text("> ${app.appLabel}", fontFamily = Mono, fontWeight = FontWeight.Bold) },
         text = {
             Column {
-                Text(app.packageName, color = Dim, fontFamily = Mono, fontSize = 13.sp)
-                Spacer(Modifier.height(12.dp))
-                Text("First Active", color = Green, fontFamily = Mono, fontSize = 12.sp)
-                Text(fmt(app.firstSeen), fontFamily = Mono, fontSize = 14.sp)
-                Spacer(Modifier.height(8.dp))
-                Text("Last Active", color = Green, fontFamily = Mono, fontSize = 12.sp)
-                Text("${fmt(app.lastActive)} (${rel(app.lastActive)})", fontFamily = Mono, fontSize = 14.sp)
-                Spacer(Modifier.height(8.dp))
-                Text("Active Duration / Events", color = Green, fontFamily = Mono, fontSize = 12.sp)
-                Text("${fmtDuration(app.activeDurationMs)} / ${app.eventCount}", fontFamily = Mono, fontSize = 14.sp)
-                Spacer(Modifier.height(8.dp))
-                Text("Estimated Deletion", color = Red, fontFamily = Mono, fontSize = 12.sp)
-                Text("Between ${fmt(app.lastActive)} and ${fmt(app.detectedAt)}", fontFamily = Mono, fontSize = 14.sp)
+                Text(app.packageName, color = Dim, fontFamily = Mono, fontSize = 10.5.sp)
+                Spacer(Modifier.height(10.dp))
+                Text("First Active", color = Green, fontFamily = Mono, fontSize = 9.5.sp)
+                Text(fmt(app.firstSeen), fontFamily = Mono, fontSize = 11.sp)
+                Spacer(Modifier.height(6.dp))
+                Text("Last Active", color = Green, fontFamily = Mono, fontSize = 9.5.sp)
+                Text("${fmt(app.lastActive)} (${rel(app.lastActive)})", fontFamily = Mono, fontSize = 11.sp)
+                Spacer(Modifier.height(6.dp))
+                Text("Active Duration / Events", color = Green, fontFamily = Mono, fontSize = 9.5.sp)
+                Text("${fmtDuration(app.activeDurationMs)} / ${app.eventCount}", fontFamily = Mono, fontSize = 11.sp)
+                Spacer(Modifier.height(6.dp))
+                Text("Estimated Deletion", color = Red, fontFamily = Mono, fontSize = 9.5.sp)
+                Text("Between ${fmt(app.lastActive)} and ${fmt(app.detectedAt)}", fontFamily = Mono, fontSize = 11.sp)
             }
         },
         confirmButton = {

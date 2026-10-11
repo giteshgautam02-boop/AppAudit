@@ -1,4 +1,4 @@
-# Arthur Audit
+# Devil Audit
 
 Android app that tracks which apps were uninstalled from the device and when they were last active.
 
@@ -17,4 +17,4 @@ Push to `main`; GitHub Actions builds the debug APK and uploads it as the `app-d
 - Usage access (Settings > Special app access > Usage access)
 - All files access (only for the residual APK scan)
 
-Developer: Devil · Team Arthur
+Developer: Devil · Team Devil

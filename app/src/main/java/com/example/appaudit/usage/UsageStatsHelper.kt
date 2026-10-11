@@ -79,20 +79,17 @@ object UsageStatsHelper {
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
                 val pkg = event.packageName ?: continue
+                val ts = event.timeStamp
+                count[pkg] = (count[pkg] ?: 0) + 1
+                first.putIfAbsent(pkg, ts)
+                last[pkg] = maxOf(last[pkg] ?: 0L, ts)
                 when (event.eventType) {
-                    UsageEvents.Event.ACTIVITY_RESUMED,
+                    UsageEvents.Event.ACTIVITY_RESUMED -> resumedAt[pkg] = ts
                     UsageEvents.Event.ACTIVITY_PAUSED,
                     UsageEvents.Event.ACTIVITY_STOPPED -> {
-                        count[pkg] = (count[pkg] ?: 0) + 1
-                        first.putIfAbsent(pkg, event.timeStamp)
-                        last[pkg] = event.timeStamp
-                        if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                            resumedAt[pkg] = event.timeStamp
-                        } else {
-                            val start = resumedAt.remove(pkg)
-                            if (start != null && event.timeStamp > start) {
-                                duration[pkg] = (duration[pkg] ?: 0L) + (event.timeStamp - start)
-                            }
+                        val begin = resumedAt.remove(pkg)
+                        if (begin != null && ts > begin) {
+                            duration[pkg] = (duration[pkg] ?: 0L) + (ts - begin)
                         }
                     }
                 }
