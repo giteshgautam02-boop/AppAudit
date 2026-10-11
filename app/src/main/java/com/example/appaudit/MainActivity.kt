@@ -56,6 +56,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -78,7 +79,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.example.appaudit.system.SystemPackageReader
+import com.example.appaudit.system.LocalFilesReader
 import com.example.appaudit.data.UninstalledApp
 import com.example.appaudit.repository.InstalledAppsRepository
 import com.example.appaudit.usage.UsageStatsHelper
@@ -318,7 +319,7 @@ fun AuditScreen() {
                 }
                 Spacer(Modifier.height(10.dp))
 
-                val titles = listOf("Deleted Apps", "Residual APKs", "Live Monitor", "System Packages", "Full Report")
+                val titles = listOf("Deleted Apps", "Residual APKs", "Live Monitor", "Local Files", "Full Report")
                 TabRow(selectedTabIndex = tab, containerColor = Bg, contentColor = Green) {
                     titles.forEachIndexed { i, t ->
                         Tab(selected = tab == i, onClick = { tab = i }, text = {
@@ -340,7 +341,7 @@ fun AuditScreen() {
                         )
                         1 -> ApkTab(hasStorage, apksInRange) { ApkScanner.openSettings(context) }
                         2 -> LiveTab(liveInRange)
-                        3 -> SystemPackagesTab()
+                        3 -> LocalFilesTab()
                         else -> {
                             val report = buildReport(range, inRange, apksInRange, liveInRange)
                             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(13.dp)) {
@@ -702,68 +703,108 @@ private fun TimelineDialog(app: UninstalledApp, onClose: () -> Unit) {
 
 
 @Composable
-private fun SystemPackagesTab() {
+private fun LocalFilesTab() {
     val scope = rememberCoroutineScope()
-    var result by remember { mutableStateOf<SystemPackageReader.Result?>(null) }
+    var path by remember { mutableStateOf(LocalFilesReader.ROOT) }
+    var result by remember { mutableStateOf<LocalFilesReader.Result?>(null) }
+    var flagged by remember { mutableStateOf<LocalFilesReader.Result?>(null) }
     var loading by remember { mutableStateOf(false) }
-    var query by remember { mutableStateOf("") }
+    var mode by remember { mutableStateOf(0) } // 0 = browse, 1 = flagged (recursive)
+
+    fun load(p: String) {
+        scope.launch {
+            loading = true
+            path = p
+            result = LocalFilesReader.list(p)
+            loading = false
+        }
+    }
+    fun loadFlagged() {
+        scope.launch {
+            loading = true
+            flagged = LocalFilesReader.findFlagged()
+            loading = false
+        }
+    }
+    fun refresh() { if (mode == 0) load(path) else loadFlagged() }
+
+    LaunchedEffect(Unit) { load(LocalFilesReader.ROOT); loadFlagged() }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 13.dp)) {
         Spacer(Modifier.height(10.dp))
-        Text(
-            "Source: /data/system → packages.list, packages.xml, packages.xml.bak, package_cache. Root required.",
-            color = Dim, fontFamily = Mono, fontSize = 10.sp
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            listOf("All Files", "⚠ Flagged (sh/key/tok)").forEachIndexed { i, label ->
+                val sel = mode == i
+                Box(
+                    Modifier.weight(1f).clip(Round)
+                        .background(if (sel) Green else Panel)
+                        .border(1.dp, if (sel) Green else Border, Round)
+                        .clickable { mode = i }.padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(label, color = if (sel) Color.Black else Dim, fontFamily = Mono, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
         Spacer(Modifier.height(8.dp))
-        Box(
-            Modifier.fillMaxWidth().clip(Round).background(Green)
-                .clickable(enabled = !loading) {
-                    scope.launch {
-                        loading = true
-                        result = SystemPackageReader.readAll()
-                        loading = false
-                    }
-                }.padding(vertical = 13.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                if (loading) "Reading…" else "Read System Packages",
-                color = Color.Black, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold
-            )
+        Text(if (mode == 0) path else "${LocalFilesReader.ROOT} (saare subfolders mein search)", color = Cyan, fontFamily = Mono, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (mode == 0 && path != LocalFilesReader.ROOT) {
+                Box(
+                    Modifier.weight(1f).clip(Round).border(1.dp, Dim, Round)
+                        .clickable(enabled = !loading) { load(path.substringBeforeLast('/').ifEmpty { LocalFilesReader.ROOT }) }
+                        .padding(vertical = 11.dp),
+                    contentAlignment = Alignment.Center
+                ) { Text("⬆ Up", fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+            }
+            Box(
+                Modifier.weight(1f).clip(Round).background(Green)
+                    .clickable(enabled = !loading) { refresh() }.padding(vertical = 11.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(if (loading) "Reading…" else "Refresh", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
         }
         Spacer(Modifier.height(8.dp))
 
-        val r = result
-        if (r == null) {
-            Text("Button dabao — 4 files ek list mein merge hongi.", color = Dim)
-        } else {
-            r.status.forEach { Text(it, color = if (r.rootAvailable) Cyan else Red, fontFamily = Mono, fontSize = 10.5.sp) }
-            val shown = r.packages.filter { query.isBlank() || it.packageName.contains(query, ignoreCase = true) }
-            if (r.packages.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                androidx.compose.material3.OutlinedTextField(
-                    value = query, onValueChange = { query = it }, singleLine = true,
-                    placeholder = { Text("Search package…", color = Dim) },
-                    modifier = Modifier.fillMaxWidth()
+        when (val r = if (mode == 0) result else flagged) {
+            null -> Text("Loading…", color = Dim)
+            is LocalFilesReader.Result.Error -> Text(r.message, color = Red, fontFamily = Mono, fontSize = 11.sp)
+            is LocalFilesReader.Result.Ok -> {
+                val flaggedCount = r.entries.count { it.flag != null }
+                Text(
+                    if (mode == 0) "${r.entries.size} items  •  ⚠ $flaggedCount flagged" else "${r.entries.size} flagged files",
+                    color = Green, fontFamily = Mono, fontSize = 11.sp
                 )
-                Spacer(Modifier.height(4.dp))
-                Text("Total (merged): ${shown.size} / ${r.packages.size}", color = Green, fontFamily = Mono, fontSize = 11.sp)
                 Spacer(Modifier.height(6.dp))
-            }
-            LazyColumn(
-                contentPadding = PaddingValues(bottom = 77.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(shown) { p ->
-                    Column(Modifier.fillMaxWidth().panel().padding(11.dp)) {
-                        Text(p.packageName, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text("Found in: " + p.sources.joinToString { it.label }, color = Cyan, fontFamily = Mono, fontSize = 10.sp)
-                        p.isSystemApp?.let { Text(if (it) "Type: System app" else "Type: User app", fontFamily = Mono, fontSize = 10.5.sp) }
-                        p.uid?.let { Text("UID: $it", color = Dim, fontFamily = Mono, fontSize = 10.sp) }
-                        p.versionCode?.let { Text("Version code: $it", color = Dim, fontFamily = Mono, fontSize = 10.sp) }
-                        p.installer?.let { Text("Installer: $it", color = Dim, fontFamily = Mono, fontSize = 10.sp) }
-                        p.codePath?.let { Text("Path: $it", color = Dim, fontFamily = Mono, fontSize = 9.5.sp) }
-                        p.dataDir?.let { Text("Data: $it", color = Dim, fontFamily = Mono, fontSize = 9.5.sp) }
+                if (r.entries.isEmpty()) {
+                    Text(if (mode == 0) "Folder khali hai." else "Koi flagged file nahi mili.", color = Dim)
+                }
+                LazyColumn(
+                    contentPadding = PaddingValues(bottom = 77.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(r.entries) { e ->
+                        val hot = e.flag != null
+                        Column(
+                            Modifier.fillMaxWidth()
+                                .panel(border = if (hot) Red else Border, bg = if (hot) Color(0xFF1C1014) else Panel)
+                                .clickable(enabled = e.isDir && mode == 0) { load(e.path) }.padding(11.dp)
+                        ) {
+                            Text(
+                                (if (e.isDir) "📁 " else if (e.isLink) "🔗 " else "📄 ") + e.name,
+                                fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 12.sp
+                            )
+                            if (hot) Text("⚠ ${e.flag}", color = Red, fontFamily = Mono, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                            if (mode == 1) Text(e.path, color = Cyan, fontFamily = Mono, fontSize = 9.5.sp)
+                            Text(
+                                (if (e.isDir) "Folder" else fmtSize(e.size)) + "  •  " + e.modified,
+                                color = Dim, fontFamily = Mono, fontSize = 10.sp
+                            )
+                            Text("${e.perms}  ${e.owner}", color = Dim, fontFamily = Mono, fontSize = 9.5.sp)
+                            e.linkTarget?.let { Text("→ $it", color = Cyan, fontFamily = Mono, fontSize = 9.5.sp) }
+                        }
                     }
                 }
             }
