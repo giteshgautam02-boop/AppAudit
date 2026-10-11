@@ -43,16 +43,26 @@ object ShellAccess {
         p.waitFor(10, TimeUnit.SECONDS) && out.contains("uid=0")
     } catch (_: Throwable) { false }
 
+    /** Shizuku hands its binder to the app a moment after launch, so wait a little for it. */
+    private fun awaitBinder(timeoutMs: Long = 3000): Boolean {
+        val end = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < end) {
+            if (shizukuRunning()) return true
+            try { Thread.sleep(200) } catch (_: InterruptedException) { return false }
+        }
+        return shizukuRunning()
+    }
+
     fun detectMode(): Mode = when {
         rootWorks() -> Mode.ROOT
-        shizukuGranted() -> Mode.SHIZUKU
+        awaitBinder() && shizukuGranted() -> Mode.SHIZUKU
         else -> Mode.NONE
     }
 
     /** Human readable reason for Mode.NONE; also pops the Shizuku permission dialog if needed. */
     fun explainNone(): String =
         if (!shizukuRunning()) {
-            "Root nahi mila aur Shizuku chalu nahi hai. Shizuku app kholke \"Start\" karo, phir Refresh dabao."
+            "Root nahi mila aur Shizuku se connect nahi hua. Shizuku app mein \"Running\" check karo (na ho to Start karo), phir App Audit ko band karke dobara kholo."
         } else {
             requestShizuku()
             "Shizuku permission maangi gayi hai — \"Allow\" karke phir Refresh dabao."
